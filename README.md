@@ -112,7 +112,7 @@ Set account id and region.
 
 You can find your Account ID and Region via the AWS Console. Alternatively, query the aws cli.
 
-``
+```
 aws sts get-caller-identity --query Account --output text
 curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | head -c-1
 ```
