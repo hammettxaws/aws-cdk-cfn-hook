@@ -19,8 +19,8 @@ class HookCdkStack(Stack):
         deploy_input = codepipeline.Artifact()
 
         repo = codecommit.Repository(self, "Repository",
-            repository_name="MyRepositoryNameHook",
-            code=codecommit.Code.from_directory("repo","develop")
+            repository_name="CloudFormationHooks",
+            code=codecommit.Code.from_directory("repo","main")
         )
         cdk.CfnOutput(self, "RepositoryName", value=repo.repository_name)
         hook_execution_role = iam.Role(self, "Role",
@@ -33,28 +33,28 @@ class HookCdkStack(Stack):
             actions=["*"],
             resources=["*"],
             effect=iam.Effect.DENY)
-            )
-        project = codebuild.Project(self, "MyProject",
-        source=codebuild.Source.code_commit(repository=repo, branch_or_ref='develop'),
-        environment=codebuild.BuildEnvironment(
-            compute_type=codebuild.ComputeType.LARGE,
-            privileged=True,
-            build_image=codebuild.LinuxBuildImage.AMAZON_LINUX_2_4,
-            environment_variables={
-                "hook_execution_role": codebuild.BuildEnvironmentVariable(
-                    value=hook_execution_role.role_arn
-                )
-                }
         )
+        project = codebuild.Project(self, "CloudFormationHookProject",
+            source=codebuild.Source.code_commit(repository=repo, branch_or_ref='main'),
+            environment=codebuild.BuildEnvironment(
+                compute_type=codebuild.ComputeType.LARGE,
+                privileged=True,
+                build_image=codebuild.LinuxBuildImage.AMAZON_LINUX_2_4,
+                environment_variables={
+                    "hook_execution_role": codebuild.BuildEnvironmentVariable(
+                        value=hook_execution_role.role_arn
+                    )
+                }
+            )
         )
 
-        pipeline = codepipeline.Pipeline(self, "MyPipeline", enable_key_rotation=True)
+        pipeline = codepipeline.Pipeline(self, "CloudFormationHookPipeline", enable_key_rotation=True)
         
         source_action = codepipeline_actions.CodeCommitSourceAction(
             action_name="CodeCommit",
             repository=repo,
             output=deploy_input,
-            branch='develop'
+            branch='main'
         )
 
         build_action = codepipeline_actions.CodeBuildAction(
@@ -75,19 +75,17 @@ class HookCdkStack(Stack):
             actions=["kms:EnableKeyRotation","kms:PutKeyPolicy","kms:Decrypt","kms:GenerateDataKey"],
             resources=["arn:aws:kms:"+ Stack.of(self).region + ":" + Stack.of(self).account + ":key/*"],
             effect=iam.Effect.ALLOW)
-            )
-        
+        )
         project.add_to_role_policy(iam.PolicyStatement(
             actions=["kms:CreateKey"],
             resources=["*"],
             effect=iam.Effect.ALLOW)
-            )
-
+        )
         project.add_to_role_policy(iam.PolicyStatement(
             actions=["cloudformation:DescribeType*","cloudformation:RegisterType","cloudformation:SetTypeDefaultVersion","cloudformation:ListTypes","cloudformation:SetTypeConfiguration"],
             resources=["*"],
             effect=iam.Effect.ALLOW)
-            )
+        )
         LogAndMetricsDeliveryRole = "arn:aws:iam::" + Stack.of(self).account + ":role/CloudFormationManagedUplo-LogAndMetricsDeliveryRol*"
         Stack_Name = "arn:aws:cloudformation:" + Stack.of(self).region + ":" + Stack.of(self).account + ":stack/CloudFormationManagedUploadInfrastructure/*"
 
@@ -95,12 +93,12 @@ class HookCdkStack(Stack):
             actions=["iam:PassRole"],
             resources=[LogAndMetricsDeliveryRole,hook_execution_role.role_arn],
             effect=iam.Effect.ALLOW)
-            )
+        )
         project.add_to_role_policy(iam.PolicyStatement(
             actions=["iam:CreateRole","iam:PutRolePolicy","iam:DeleteRolePolicy","iam:DeleteRole","iam:GetRolePolicy","iam:GetRole"],
             resources=[LogAndMetricsDeliveryRole],
             effect=iam.Effect.ALLOW)
-            )
+        )
         project.add_to_role_policy(iam.PolicyStatement(
             actions=[
                 "s3:CreateBucket",
@@ -114,9 +112,9 @@ class HookCdkStack(Stack):
                 "s3:GetObject"],
             resources=["arn:aws:s3:::cloudformationmanageduploadinfra*"],
             effect=iam.Effect.ALLOW)
-            )
+        )
         project.add_to_role_policy(iam.PolicyStatement(
             actions=["cloudformation:CreateStack","cloudformation:UpdateStack","cloudformation:DescribeStacks"],
             resources=[Stack_Name],
             effect=iam.Effect.ALLOW)
-            )
+        )

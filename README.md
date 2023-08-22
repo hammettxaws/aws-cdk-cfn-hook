@@ -11,6 +11,7 @@
 - [**Create New Hook**](#newhook)
 - [**Clean Up**](#cleanup)
 - [**Conclusion**](#conclusion)
+- [**Appendixx**](#appendix)
 
 
 
@@ -105,17 +106,29 @@ $ pip install -r requirements.txt
 
 ## Bootstrap CDK environment 
 
-```
-cdk bootstrap aws://<ACCOUNT_ID>/<ACCOUNT_REGION>
-```
-
 ## Deploy the Solution
-Set account id and region
 
+Set account id and region.
+
+You can find your Account ID and Region via the AWS Console. Alternatively, query the aws cli.
+
+``
+aws sts get-caller-identity --query Account --output text
+curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | head -c-1
+```
+
+This project expects your CDK_REGION and CDK_ACCOUNT to be defined.
 ```
 export CDK_REGION=<ACCOUNT_REGION>
 export CDK_ACCOUNT=<ACCOUNT_ID>
 ```
+
+Bootstrap your environment.
+
+```
+cdk bootstrap aws://<ACCOUNT_ID>/<ACCOUNT_REGION>
+```
+
 At this point you can now synthesize the CloudFormation template for this code.
 
 ```
@@ -130,11 +143,11 @@ $ cdk deploy
 Get the Repository Name ``` RepositoryName ``` from the CloudFormation stack output from the CloudFormation console or using the AWS CLI:
 
 ```
-aws CloudFormation describe-stacks --stack-name HookCdkStack --query "Stacks[0].Outputs[0].OutputValue"
+aws cloudformation describe-stacks --stack-name HookCdkStack --query "Stacks[0].Outputs[0].OutputValue" --output text
 ```
 
 
-<a name='parameterdetails'></a>Update `parameter.json ` in the **repo** folder accordingly:
+<a name='parameterdetails'></a>Update `parameter.json` in the **repo** folder accordingly to enable failure mode.
 
 ```
 {
@@ -155,7 +168,7 @@ aws CloudFormation describe-stacks --stack-name HookCdkStack --query "Stacks[0].
 
 - target_stack set to **NONE** turns the hook off, so it doesn't apply to stack operations.
 
-For more information, please check the hook confirmation schema in this [page](https://docs.aws.amazon.com/CloudFormation-cli/latest/userguide/hooks-structure.html)
+For more information, please check the hook confirmation schema in this [page](https://docs.aws.amazon.com/cloudformation-cli/latest/userguide/hooks-structure.html)
 
 ## Run the Pipeline
 
@@ -165,7 +178,7 @@ Click **Release change** at the top right to execute the hook pipeline, applying
 
 # <a name='verification'></a>Verification
 
-Once the pipeline completes, navigate to the CloudFormation console. On the left menu locate the Registry, click Activated extensions, Hooks tab (filter with Privately Registered), and locate the EC2 hook. 
+Once the pipeline completes, navigate to the CloudFormation console. On the left menu locate the Registry, click `Activated extensions`, click the `Hooks` tab, filter with `Privately Registered`, and locate the EC2 hook. 
 
 ![Alt text](images/registered_hook.png)
 
@@ -176,7 +189,7 @@ Click on the hook name to review it’s schema, configuration, and target resour
 A sample CFN template to create EC2 instance is provided in Test Folder. Deploy this sample stack with EC2 instance type. 
 
 ```
-aws CloudFormation create-stack --stack-name <Stack_Name --region <AWS_Region> --template-body file://test_ec2_template/ec2.yaml
+aws cloudformation create-stack --stack-name hook-test-ec2 --template-body file://repo/test_ec2_template/ec2.yaml
 ```
 The stack would fail if the instance type is not listed in ec2_instance_type_allowed property. the following screenshot shows a stack fail scenario where ec2 instance type does not match with ec2_instance_type_allowed property
 
@@ -239,6 +252,12 @@ aws cloudformation deregister-type --type HOOK --type-name MyCompany::EC2::Hook
 Note: If there is more than one registered version of the hook, each version must be de-registered.
 
 ```
+aws cloudformation list-type-versions --type HOOK --type-name <hook-name>
+aws cloudformation deregister-type --type HOOK --type-name MyCompany::EC2::Hook --version-id 00000001
+```
+
+Alternatively, reference the hook version ARN.
+```
 aws cloudformation deregister-type --arn arn:aws:cloudformation:<region>:<account>:type/hook/<hook-name>/<version>
 ```
 
@@ -270,3 +289,96 @@ See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more inform
 
 This library is licensed under the MIT-0 License. See the LICENSE file.
 
+# <a name='appendix'></a>Appendix
+
+## Creating a CloudFormation Hook manually.
+
+First time users may want to create a CloudFormation Hook manually to understand the automated process above.
+
+Let's start by creating a new workspace
+
+```
+mkdir my-first-cfn-hook
+cdk my-first-cfn-hook
+```
+
+Install CloudFormation CLI
+```
+python3 -m venv env
+source env/bin/activate
+pip3 install cloudformation-cli cloudformation-cli-python-plugin
+pip3 install --upgrade cloudformation-cli cloudformation-cli-python-plugin
+```
+
+Initialize Project
+```
+cfn init
+```
+
+Create a hook
+```
+Do you want to develop a new resource(r) or a module(m) or a hook(h)?.
+>> h
+```
+
+Define a hook project
+```
+What's the name of your hook type?
+(Organization::Service::Hook)
+>> Sample::S3::Hook
+```
+
+Select the appropriate language plugin
+```
+Select a language for code generation:
+[1] python37
+[2] python38
+[3] python39
+(enter an integer): 
+>> [1] python37
+```
+
+While docker isn't required, it's highly recommended to make development easier.
+```
+Use docker for platform-independent packaging (Y/n)?
+This is highly recommended unless you are experienced 
+with cross-platform Python packaging.
+>> Y
+```
+
+Upate hook schema
+
+If using the hook naming above, it is located in `./sample-s3-hook.json`.
+
+Update handlers.py with your business logic.
+
+If using the hook naming above, it is located in `./src/sample_s3_hook/handlers.py`.
+
+Generate your hook which will update and replace `./src/<hook>/models.py`.
+```
+cfn generate
+```
+
+Submit your hook in your region/account.
+```
+cfn submit
+```
+
+The following options are commonly used
+- `--dry-run` will build but not send to your registry
+- `--set-default` will point to the version deployed
+
+Activate hook
+
+Once your hook has been submitted to your CloudFormation registry you need to update the configuration to activate it.
+
+```
+{"CloudFormationConfiguration":{"HookConfiguration":{"TargetStacks":"ALL","FailureMode":"FAIL","Properties":{}}}}
+```
+
+Alternatively, with appropriate permissions, you can activate via the aws cli.
+```
+aws cloudformation --region <region> set-type-configuration \
+  --type-arn arn:aws:cloudformation:<region>:<account>/type/hook/<hook> \
+  --configuration "{\"CloudFormationConfiguration\":{\"HookConfiguration\":{\"TargetStacks\":\"ALL\",\"FailureMode\":\"FAIL\",\"Properties\":{}}}}"
+```
