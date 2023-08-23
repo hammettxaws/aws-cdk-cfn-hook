@@ -32,7 +32,7 @@ Let's start by creating a new workspace
 
 ```
 mkdir my-first-cfn-hook
-cdk my-first-cfn-hook
+cd my-first-cfn-hook
 ```
 
 Install CloudFormation CLI
