@@ -3,6 +3,7 @@
 <!-- vscode-markdown-toc -->
 # Table of Contents
 - [**Overview**](#overview)
+- [**Hook Introduction**](#hook-introduction)
 - [**Solution**](#solution)
 - [**Target Architecture**](#arch)
 - [**Repository Structure**](#repo)
@@ -11,7 +12,6 @@
 - [**Create New Hook**](#newhook)
 - [**Clean Up**](#cleanup)
 - [**Conclusion**](#conclusion)
-- [**Appendixx**](#appendix)
 
 
 
@@ -20,6 +20,135 @@
 AWS CloudFormation Hooks are a feature within the AWS CloudFormation service that allows users to execute custom actions at specific points in the lifecycle of a CloudFormation stack. Hooks can be used to perform additional tasks, such as validating input parameters, updating resources, or triggering notifications. Hooks are defined as Lambda functions and can be easily integrated into a CloudFormation stack to enhance its functionality and automate complex processes. These hooks provide a flexible and efficient way to manage the lifecycle of a CloudFormation stack, enabling users to automate and standardize deployment and management tasks. 
 
 CloudFormation Hooks proactively inspect the configuration of your AWS resources before provisioning. If non-compliant resources are found, AWS CloudFormation returns a failure status and either fails the operation or provides a warning and allows the operation to continue based on the hook failure mode. Organizations can develop custom rules for proactive compliance. This pattern demonstrates how to create, update, and deploy CloudFormation hooks through a CI/CD pipeline using AWS Cloud Development Kit as Infrastructure as Code.
+
+
+# <a name='hook-introduction'></a>Hook Introduction
+
+## Creating a CloudFormation Hook manually.
+
+First time users may want to create a CloudFormation Hook manually to understand the automated process above.
+
+Let's start by creating a new workspace
+
+```
+mkdir my-first-cfn-hook
+cdk my-first-cfn-hook
+```
+
+Install CloudFormation CLI
+```
+python3 -m venv env
+source env/bin/activate
+pip3 install cloudformation-cli cloudformation-cli-python-plugin
+pip3 install --upgrade cloudformation-cli cloudformation-cli-python-plugin
+```
+
+Initialize Project via the CloudFormation CLI.
+```
+cfn init
+```
+
+Create a hook
+```
+Do you want to develop a new resource(r) or a module(m) or a hook(h)?.
+>> h
+```
+
+Define a hook project
+```
+What's the name of your hook type?
+(Organization::Service::Hook)
+>> MyCompany::S3::Hook
+```
+
+Select the appropriate language plugin
+```
+Select a language for code generation:
+[1] python37
+[2] python38
+[3] python39
+(enter an integer): 
+>> [1] python37
+```
+
+While docker isn't required, it's highly recommended to make development easier.
+```
+Use docker for platform-independent packaging (Y/n)?
+This is highly recommended unless you are experienced 
+with cross-platform Python packaging.
+>> Y
+```
+
+Upate hook schema
+
+Update your local copy of `./mycompany-s3-hook.json` using the contents of `./repo/hooks/mycompany-s3-log/mycompany-s3-log.json`
+
+Update `./src/mycompany_s3_hook/handlers.py` with our business logic `./repo/hooks/mycompany-s3-log/src/mycompany_s3_log/handlers.py`.
+
+```
+cfn generate
+```
+
+Submit your hook in your region/account.
+```
+cfn submit
+```
+
+The following options are commonly used
+- `--dry-run` will build but not send to your registry
+- `--set-default` will point to the version deployed
+
+Activate hook
+
+Once your hook has been submitted to your CloudFormation registry you need to update the configuration to activate it.
+
+```
+{"CloudFormationConfiguration":{"HookConfiguration":{"TargetStacks":"ALL","FailureMode":"FAIL","Properties":{}}}}
+```
+
+Alternatively, with appropriate permissions, you can activate via the aws cli.
+```
+aws cloudformation --region <region> set-type-configuration \
+  --type-arn arn:aws:cloudformation:<region>:<account>/type/hook/<hook> \
+  --configuration "{\"CloudFormationConfiguration\":{\"HookConfiguration\":{\"TargetStacks\":\"ALL\",\"FailureMode\":\"FAIL\",\"Properties\":{}}}}"
+```
+
+Validate
+
+Create a stack with S3 Bucket, save the following to `cfn-bucket.yaml` or reference the file in `test/bucket.yaml`.
+
+```
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+```
+
+Create the stack
+
+```
+aws cloudformation create-stack --stack-name hook-test-s3-log --template-body file://test/bucket.yaml
+```
+
+Check your CloudFormation's creation events.
+
+You can view the logs via command-line.
+
+```
+aws cloudformation describe-stack-events --stack-name hook-test-s3-log
+```
+
+You can also view within CloudWatch > Logs > Log groups > mycompany-s3-log-logs
+
+## Hook with additional logic
+
+Let's assume we want to restrict the creation of S3 buckets so that they must have KMS encryption enabled.
+
+Update with properties
+
+defaults seem to be a reference, not values that are passed through
+```
+{"CloudFormationConfiguration":{"HookConfiguration":{"TargetStacks":"ALL","FailureMode":"FAIL","Properties":{"encryptionAlgorithm": "aws:kms"}}}}
+```
 
 # <a name='solution'></a>Solution
 
@@ -288,97 +417,3 @@ See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more inform
 ## License
 
 This library is licensed under the MIT-0 License. See the LICENSE file.
-
-# <a name='appendix'></a>Appendix
-
-## Creating a CloudFormation Hook manually.
-
-First time users may want to create a CloudFormation Hook manually to understand the automated process above.
-
-Let's start by creating a new workspace
-
-```
-mkdir my-first-cfn-hook
-cdk my-first-cfn-hook
-```
-
-Install CloudFormation CLI
-```
-python3 -m venv env
-source env/bin/activate
-pip3 install cloudformation-cli cloudformation-cli-python-plugin
-pip3 install --upgrade cloudformation-cli cloudformation-cli-python-plugin
-```
-
-Initialize Project
-```
-cfn init
-```
-
-Create a hook
-```
-Do you want to develop a new resource(r) or a module(m) or a hook(h)?.
->> h
-```
-
-Define a hook project
-```
-What's the name of your hook type?
-(Organization::Service::Hook)
->> Sample::S3::Hook
-```
-
-Select the appropriate language plugin
-```
-Select a language for code generation:
-[1] python37
-[2] python38
-[3] python39
-(enter an integer): 
->> [1] python37
-```
-
-While docker isn't required, it's highly recommended to make development easier.
-```
-Use docker for platform-independent packaging (Y/n)?
-This is highly recommended unless you are experienced 
-with cross-platform Python packaging.
->> Y
-```
-
-Upate hook schema
-
-If using the hook naming above, it is located in `./sample-s3-hook.json`.
-
-Update handlers.py with your business logic.
-
-If using the hook naming above, it is located in `./src/sample_s3_hook/handlers.py`.
-
-Generate your hook which will update and replace `./src/<hook>/models.py`.
-```
-cfn generate
-```
-
-Submit your hook in your region/account.
-```
-cfn submit
-```
-
-The following options are commonly used
-- `--dry-run` will build but not send to your registry
-- `--set-default` will point to the version deployed
-
-Activate hook
-
-Once your hook has been submitted to your CloudFormation registry you need to update the configuration to activate it.
-
-```
-{"CloudFormationConfiguration":{"HookConfiguration":{"TargetStacks":"ALL","FailureMode":"FAIL","Properties":{}}}}
-```
-
-Alternatively, with appropriate permissions, you can activate via the aws cli.
-```
-aws cloudformation --region <region> set-type-configuration \
-  --type-arn arn:aws:cloudformation:<region>:<account>/type/hook/<hook> \
-  --configuration "{\"CloudFormationConfiguration\":{\"HookConfiguration\":{\"TargetStacks\":\"ALL\",\"FailureMode\":\"FAIL\",\"Properties\":{}}}}"
-```
