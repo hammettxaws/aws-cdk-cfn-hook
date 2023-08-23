@@ -58,7 +58,7 @@ Define a hook project
 ```
 What's the name of your hook type?
 (Organization::Service::Hook)
->> MyCompany::S3::Hook
+>> MyCompany::S3::Log
 ```
 
 Select the appropriate language plugin
@@ -81,15 +81,15 @@ with cross-platform Python packaging.
 
 Upate hook schema
 
-Update your local copy of `./mycompany-s3-hook.json` using the contents of `./repo/hooks/mycompany-s3-log/mycompany-s3-log.json`
+Update your local copy of `./mycompany-s3-log.json` using the contents of `./repo/hooks/mycompany-s3-log/mycompany-s3-log.json`
 
-Update `./src/mycompany_s3_hook/handlers.py` with our business logic `./repo/hooks/mycompany-s3-log/src/mycompany_s3_log/handlers.py`.
+Update `./src/mycompany_s3_log/handlers.py` with our business logic `./repo/hooks/mycompany-s3-log/src/mycompany_s3_log/handlers.py`.
 
 ```
 cfn generate
 ```
 
-Submit your hook in your region/account.
+Submit your hook in your region/account. This is the first time you're submitting your hook so `--set-default` is not required.
 ```
 cfn submit
 ```
@@ -141,14 +141,33 @@ You can also view within CloudWatch > Logs > Log groups > mycompany-s3-log-logs
 
 ## Hook with additional logic
 
-Let's assume we want to restrict the creation of S3 buckets so that they must have KMS encryption enabled.
+Let's assume we want to restrict the creation of S3 buckets so that they must have KMS encryption enabled. We'll update our existing hook.
 
-Update with properties
+Update your local copy of `./mycompany-s3-log.json` using the contents of `./repo/hooks/mycompany-s3-encryption/mycompany-s3-encryption.json`
 
-defaults seem to be a reference, not values that are passed through
+Update `./src/mycompany_s3_log/handlers.py` with our business logic `./repo/hooks/mycompany-s3-encyrption/src/mycompany_s3_encryption/handlers.py`.
+
+```
+cfn generate
+```
+
+Submit your hook in your region/account. You have have multiple versions so set submitted version as default.
+```
+cfn submit --set-default
+```
+
+
+While we have set defaults in our schema, we need to update our configuration to provide properties. Update in the CloudFormation console > Registry > Activated extensions > Hooks (tab) > update Filter extension type to `Privately registered` > MyCompany::S3::Log > Configuration (tab) > click `Edit Configuration`.
 ```
 {"CloudFormationConfiguration":{"HookConfiguration":{"TargetStacks":"ALL","FailureMode":"FAIL","Properties":{"encryptionAlgorithm": "aws:kms"}}}}
 ```
+
+Attempt to re-deploy
+
+```
+aws cloudformation create-stack --stack-name hook-test-s3-log-2 --template-body file://test/bucket.yaml
+```
+
 
 # <a name='solution'></a>Solution
 

@@ -1,6 +1,6 @@
 {
-    "typeName": "MyCompany::S3::Encryption",
-    "description": "Ensure S3 Buckets have KMS enabled",
+    "typeName": "MyCompany::S3::Log",
+    "description": "Log output on S3 resources",
     "sourceUrl": "https://github.com/aws-cloudformation/example-sse-hook",
     "documentationUrl": "https://github.com/aws-cloudformation/example-sse-hook/blob/master/README.md",
     "typeConfiguration": {
@@ -11,6 +11,7 @@
                 "type":"string"
             }
         },
+
         "additionalProperties": false
     },
     "required": [],

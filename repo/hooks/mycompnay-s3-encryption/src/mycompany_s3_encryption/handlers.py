@@ -17,7 +17,7 @@ from .models import HookHandlerRequest, TypeConfigurationModel
 
 # Use this logger to forward log messages to CloudWatch Logs.
 LOG = logging.getLogger(__name__)
-TYPE_NAME = "MyCompany::S3::Encryption"
+TYPE_NAME = "MyCompany::S3::Log"
 
 LOG.setLevel(logging.INFO)
 
